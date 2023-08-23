@@ -103,7 +103,7 @@ export type OnShippingChangeActionsType = {|
 
 export type LogInvalidShippingChangePatchesPayload = {|
     appName? : string,
-    buyerAccessToken : string,
+    buyerAccessToken : string | null | undefined,
     data : $ReadOnlyArray<Query>,
     shouldUsePatchShipping : boolean,
 |};
