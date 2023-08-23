@@ -67,14 +67,15 @@ describe("onShippingChange", () => {
       );
 
       if (fn) {
-        fn({ orderID: "EC-abc123", paymentID: "abc123" }, invocationActions);
+        fn({ orderID: "EC-abc123" }, invocationActions);
       }
 
       expect(merchantOnShippingChange).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           orderID: "EC-abc123",
           paymentID: "abc123",
-        },
+          paymentId: "abc123",
+        }),
         expect.anything()
       );
     });
