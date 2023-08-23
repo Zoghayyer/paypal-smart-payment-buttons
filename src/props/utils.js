@@ -3,7 +3,6 @@
 import type { Breakdown } from '../types';
 
 import { type Query, type ShippingOption, ON_SHIPPING_CHANGE_PATHS } from './onShippingChange';
-import { getLogger } from '../lib';
 
 
 export const calculateTotalFromShippingBreakdownAmounts = ({ breakdown, updatedAmounts } : {| breakdown : Breakdown, updatedAmounts : {| [string] : ?string |} |}) : string => {
@@ -96,73 +95,4 @@ export const updateOperationForShippingOptions = ({ queries } : {| queries : {| 
     }
 
     return convertQueriesToArray({ queries });
-}
-
-
-/**
- * Full matches the following;
- *  /purchase_units/@reference_id=='default'/amount
- *  /purchase_units/@reference_id=='default'/shipping/address
- *  /purchase_units/@reference_id=='default'/shipping/options
- *  /purchase_units/@reference_id=='d9f80740-38f0-11e8-b467-0ed5f89f718b'/amount
- */
-const pathPattern = new RegExp(
-    /^\/purchase_units\/@reference_id=='(?:\w|-)*'\/(?:amount|shipping\/(?:options|address))$/
-);
-
-/**
- *
- * @param {array} result
- * @param {{ path: string; }} patch
- * @returns {array}
- */
-const sanitizePatch = (rejected, patch) => {
-    const { path } = patch;
-
-    if (!pathPattern.test(path)) {
-        rejected.push(path);
-    }
-    return rejected;
-};
-
-/**
- *
- * @param {string} appName
- * @returns {boolean}
- */
-export const isWeasley = (appName: string) => appName === 'weasley';
-
-export const logInvalidShippingChangePatches = ({ appName, buyerAccessToken, data, shouldUsePatchShipping }) => {
-    try {
-        if (Array.isArray(data)) {
-            const rejected = data.reduce(sanitizePatch, []);
-            if (rejected.length > 0) {
-                getLogger()
-                .info(`button_shipping_change_patch_data_has_invalid_path_${appName}`, {
-                    appName,
-                    rejected: JSON.stringify(rejected),
-                    hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
-                    shouldUsePatchShipping: String(shouldUsePatchShipping)
-                })
-                .flush();
-            }
-        } else {
-            getLogger()
-            .info('button_shipping_change_patch_data_is_object', {
-                appName,
-                hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
-                shouldUsePatchShipping: String(shouldUsePatchShipping)
-            })
-            .flush();
-        }
-    } catch(err) {
-        getLogger()
-        .error('button_shipping_change_patch_data_logging_failed', {
-            appName,
-            errMessage: JSON.stringify(err),
-            hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
-            shouldUsePatchShipping: String(shouldUsePatchShipping)
-        })
-        .flush();
-    }
 }

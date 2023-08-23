@@ -5,17 +5,29 @@ import { ZalgoPromise } from "@krakenjs/zalgo-promise/src";
 import { describe, beforeEach, test, expect, vi } from "vitest";
 
 import { patchShipping, patchOrder } from "../api";
-import { getLogger } from "../lib";
 
-import { getOnShippingChange } from "./onShippingChange";
+import {
+  getOnShippingChange,
+  logInvalidShippingChangePatches,
+  isWeasley,
+} from "./onShippingChange";
 
 vi.mock("../api");
 vi.mock("./createOrder");
-vi.mock("../lib");
+
+const logger = {
+  error: vi.fn(() => logger),
+  info: vi.fn(() => logger),
+  track: vi.fn(() => logger),
+  flush: vi.fn(),
+};
+
+vi.mock("../lib/logger", () => ({
+  getLogger: vi.fn(() => logger),
+}));
 
 const mockPatchOrder = patchOrder;
 const mockPatchShipping = patchShipping;
-const mockGetLogger = getLogger;
 
 describe("onShippingChange", () => {
   describe("getOnShippingChange", () => {
@@ -27,6 +39,7 @@ describe("onShippingChange", () => {
     const invocationActions = {
       reject: () => ZalgoPromise.reject(),
       resolve: () => ZalgoPromise.resolve(),
+      order: { patch: ZalgoPromise.resolve() },
     };
     const featureFlags = { isLsatUpgradable: false };
 
@@ -36,15 +49,6 @@ describe("onShippingChange", () => {
       partnerAttributionID = uniqueID();
       orderID = uniqueID();
       createOrder.mockImplementation(() => ZalgoPromise.resolve(orderID));
-
-      // $FlowFixMe
-      mockGetLogger.mockReturnValue({
-        // $FlowFixMe
-        info: () => ({
-          // $FlowFixMe
-          track: () => ({ flush: () => undefined }),
-        }),
-      });
     });
 
     test("should invoke onShippingChange with a paymentID aliased to orderID", () => {
@@ -63,15 +67,14 @@ describe("onShippingChange", () => {
       );
 
       if (fn) {
-        fn({ orderID: "EC-abc123" }, invocationActions);
+        fn({ orderID: "EC-abc123", paymentID: "abc123" }, invocationActions);
       }
 
       expect(merchantOnShippingChange).toHaveBeenCalledWith(
-        expect.objectContaining({
+        {
           orderID: "EC-abc123",
           paymentID: "abc123",
-          paymentId: "abc123",
-        }),
+        },
         expect.anything()
       );
     });
@@ -258,6 +261,83 @@ describe("onShippingChange", () => {
 
         expect.assertions(1);
       });
+    });
+  });
+
+  describe("#isWeasley", () => {
+    test("returns `true` if appName is `weasley`", () => {
+      expect(isWeasley("weasley")).toBe(true);
+    });
+
+    test("returns `false` if appName is not `weasley`", () => {
+      expect(isWeasley("xoon")).toBe(false);
+    });
+  });
+
+  describe("#logInvalidShippingChangePatches", () => {
+    test("when appName is present and has invalid patches", () => {
+      logInvalidShippingChangePatches({
+        appName: "xoon",
+        buyerAccessToken: "ABC",
+        data: [
+          {
+            path: "/purchase_units/@reference_id=='default'",
+          },
+        ],
+        shouldUsePatchShipping: false,
+      });
+
+      expect(logger.info).toHaveBeenCalledWith(
+        "button_shipping_change_patch_data_has_invalid_path_xoon",
+        {
+          appName: "xoon",
+          rejected: "[\"/purchase_units/@reference_id=='default'\"]",
+          hasBuyerAccessToken: "true",
+          shouldUsePatchShipping: "false",
+        }
+      );
+    });
+
+    test("when it has valid patches, it should not log", () => {
+      logInvalidShippingChangePatches({
+        appName: "xoon",
+        buyerAccessToken: "ABC",
+        data: [
+          {
+            path: "/purchase_units/@reference_id=='default'/amount",
+          },
+          {
+            path: "/purchase_units/@reference_id=='default'/shipping/address",
+          },
+          {
+            path: "/purchase_units/@reference_id=='default'/shipping/options",
+          },
+          {
+            path: "/purchase_units/@reference_id=='d9f80740-38f0-11e8-b467-0ed5f89f718b'/amount",
+          },
+        ],
+        shouldUsePatchShipping: false,
+      });
+
+      expect(logger.info).not.toHaveBeenCalled();
+    });
+
+    test("when patch `data` is not an array, it should emit an info log", () => {
+      logInvalidShippingChangePatches({
+        appName: "weasley",
+        buyerAccessToken: null,
+        data: {},
+        shouldUsePatchShipping: true,
+      });
+
+      expect(logger.info).toHaveBeenCalledWith(
+        "button_shipping_change_patch_data_is_object",
+        {
+          appName: "weasley",
+          hasBuyerAccessToken: "false",
+          shouldUsePatchShipping: "true",
+        }
+      );
     });
   });
 });

@@ -10,8 +10,6 @@ import type { OrderAmount, Experiments, FeatureFlags } from '../types';
 
 import type { CreateOrder } from './createOrder';
 
-import { logInvalidShippingChangePatches, isWeasley } from './utils';
-
 export type SHIPPING_OPTION_TYPE = 'SHIPPING' | 'PICKUP';
 export type ON_SHIPPING_CHANGE_EVENT = 'add' | 'replace';
 
@@ -64,7 +62,8 @@ export type XOnShippingChangeDataType = {|
     selected_shipping_option? : ShippingOption,
     buyerAccessToken? : ?string,
     forceRestAPI? : boolean,
-    amount? : OrderAmount
+    amount? : OrderAmount,
+    appName?: string
 |};
 
 export type XOnShippingChangeActionsType = {|
@@ -101,6 +100,74 @@ export type OnShippingChangeActionsType = {|
     resolve : () => ZalgoPromise<void>,
     reject : (string) => ZalgoPromise<void>
 |};
+
+/**
+ * Full matches the following;
+ *  /purchase_units/@reference_id=='default'/amount
+ *  /purchase_units/@reference_id=='default'/shipping/address
+ *  /purchase_units/@reference_id=='default'/shipping/options
+ *  /purchase_units/@reference_id=='d9f80740-38f0-11e8-b467-0ed5f89f718b'/amount
+ */
+const pathPattern = new RegExp(
+    /^\/purchase_units\/@reference_id=='(?:\w|-)*'\/(?:amount|shipping\/(?:options|address))$/
+);
+
+/**
+ *
+ * @param {array} result
+ * @param {{ path: string; }} patch
+ * @returns {array}
+ */
+const sanitizePatch = (rejected, patch) => {
+    const { path } = patch;
+
+    if (!pathPattern.test(path)) {
+        rejected.push(path);
+    }
+    return rejected;
+};
+
+/**
+ *
+ * @param {string} appName
+ * @returns {boolean}
+ */
+export const isWeasley = (appName: string) => appName === 'weasley';
+
+export const logInvalidShippingChangePatches = ({ appName, buyerAccessToken, data, shouldUsePatchShipping }) => {
+    try {
+        if (Array.isArray(data)) {
+            const rejected = data.reduce(sanitizePatch, []);
+            if (rejected.length > 0) {
+                getLogger()
+                .info(`button_shipping_change_patch_data_has_invalid_path_${appName}`, {
+                    appName,
+                    rejected: JSON.stringify(rejected),
+                    hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
+                    shouldUsePatchShipping: String(shouldUsePatchShipping)
+                })
+                .flush();
+            }
+        } else {
+            getLogger()
+            .info('button_shipping_change_patch_data_is_object', {
+                appName,
+                hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
+                shouldUsePatchShipping: String(shouldUsePatchShipping)
+            })
+            .flush();
+        }
+    } catch(err) {
+        getLogger()
+        .error('button_shipping_change_patch_data_logging_failed', {
+            appName,
+            errMessage: JSON.stringify(err),
+            hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
+            shouldUsePatchShipping: String(shouldUsePatchShipping)
+        })
+        .flush();
+    }
+}
 
 export function buildXShippingChangeActions({ orderID, actions, facilitatorAccessToken, buyerAccessToken, partnerAttributionID, forceRestAPI, clientID, experiments, appName } : {| orderID : string, actions : OnShippingChangeActionsType, facilitatorAccessToken : string, buyerAccessToken : ?string, partnerAttributionID : ?string, forceRestAPI : boolean, experiments: Experiments; clientID: string; appName: string; |}) : XOnShippingChangeActionsType {
     const { useShippingChangeCallbackMutation } = experiments;
@@ -166,16 +233,6 @@ export function getOnShippingChange({ onShippingChange, partnerAttributionID, fe
                     // backwards compatibility. Before invoking onShippingChange,
                     // we need to remove that prefix.
                     data.paymentID = data.orderID?.replace("EC-","");
-
-                    // The Braintree SDK expects a paymentId (not paymentID) when
-                    // invoking updatePayment().
-                    // See: https://github.com/braintree/braintree-web/blob/831be9d4f7bea387cae98f22c8f215854c994b75/src/paypal-checkout/paypal-checkout.js#L589-L593
-                    // The paymentId property (lowercase "d") is passed into
-                    // onShippingChange from an internal @paypal/sdk-client consumer.
-                    // The following line's type error is explicity ignored in order
-                    // to prevent confusion about which property to use in the future.
-                    // $FlowExpectedError
-                    data.paymentId = data.paymentID;
                 }
                 return onShippingChange(buildXOnShippingChangeData(data), buildXShippingChangeActions({ orderID, facilitatorAccessToken, buyerAccessToken, actions, partnerAttributionID, forceRestAPI, clientID, experiments, appName }));
             });
