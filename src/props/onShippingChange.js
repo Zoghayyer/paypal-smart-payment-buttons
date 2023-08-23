@@ -10,6 +10,8 @@ import type { OrderAmount, Experiments, FeatureFlags } from '../types';
 
 import type { CreateOrder } from './createOrder';
 
+import { logInvalidShippingChangePatches, isWeasley } from './utils';
+
 export type SHIPPING_OPTION_TYPE = 'SHIPPING' | 'PICKUP';
 export type ON_SHIPPING_CHANGE_EVENT = 'add' | 'replace';
 
@@ -100,11 +102,14 @@ export type OnShippingChangeActionsType = {|
     reject : (string) => ZalgoPromise<void>
 |};
 
-export function buildXShippingChangeActions({ orderID, actions, facilitatorAccessToken, buyerAccessToken, partnerAttributionID, forceRestAPI, clientID, experiments } : {| orderID : string, actions : OnShippingChangeActionsType, facilitatorAccessToken : string, buyerAccessToken : ?string, partnerAttributionID : ?string, forceRestAPI : boolean, experiments: Experiments; clientID: string; |}) : XOnShippingChangeActionsType {
+export function buildXShippingChangeActions({ orderID, actions, facilitatorAccessToken, buyerAccessToken, partnerAttributionID, forceRestAPI, clientID, experiments, appName } : {| orderID : string, actions : OnShippingChangeActionsType, facilitatorAccessToken : string, buyerAccessToken : ?string, partnerAttributionID : ?string, forceRestAPI : boolean, experiments: Experiments; clientID: string; appName: string; |}) : XOnShippingChangeActionsType {
     const { useShippingChangeCallbackMutation } = experiments;
 
     const patch = (data = {}) => {
-        if(useShippingChangeCallbackMutation){
+        const shouldUsePatchShipping = Boolean(useShippingChangeCallbackMutation && !buyerAccessToken && isWeasley(appName));
+        logInvalidShippingChangePatches({ appName, buyerAccessToken, data, shouldUsePatchShipping });
+
+        if (shouldUsePatchShipping) {
             return patchShipping({ clientID, data, orderID }).catch(() => {
                 throw new Error('Order could not be patched');
             });
@@ -141,6 +146,7 @@ export function getOnShippingChange({ onShippingChange, partnerAttributionID, fe
         return ({
             buyerAccessToken,
             forceRestAPI = featureFlags.isLsatUpgradable,
+            appName = 'not_available',
             ...data
         }, actions) => {
             return createOrder().then(orderID => {
@@ -171,7 +177,7 @@ export function getOnShippingChange({ onShippingChange, partnerAttributionID, fe
                     // $FlowExpectedError
                     data.paymentId = data.paymentID;
                 }
-                return onShippingChange(buildXOnShippingChangeData(data), buildXShippingChangeActions({ orderID, facilitatorAccessToken, buyerAccessToken, actions, partnerAttributionID, forceRestAPI, clientID, experiments }));
+                return onShippingChange(buildXOnShippingChangeData(data), buildXShippingChangeActions({ orderID, facilitatorAccessToken, buyerAccessToken, actions, partnerAttributionID, forceRestAPI, clientID, experiments, appName }));
             });
         };
     }

@@ -76,82 +76,123 @@ describe("onShippingChange", () => {
       );
     });
 
-    test("should call patchOrder", async () => {
-      // $FlowFixMe
-      mockPatchOrder.mockImplementation(() => ZalgoPromise.resolve({}));
+    describe("should call patchOrder", () => {
+      test("when useShippingChangeCallbackMutation is inactive", async () => {
+        // $FlowFixMe
+        mockPatchOrder.mockImplementation(() => ZalgoPromise.resolve({}));
 
-      const patchData = [];
-      const onShippingChange = vi.fn((data, actions) => {
-        return actions.order.patch(patchData);
-      });
-
-      const experiments = { useShippingChangeCallbackMutation: false };
-
-      const buyerAccessToken = uniqueID();
-
-      const fn = getOnShippingChange(
-        {
-          onShippingChange,
-          partnerAttributionID,
-          featureFlags,
-          experiments,
-          clientID,
-        },
-        { facilitatorAccessToken, createOrder }
-      );
-
-      const data = { buyerAccessToken };
-
-      if (fn) {
-        await fn(data, invocationActions);
-        expect(patchOrder).toBeCalledWith(orderID, patchData, {
-          facilitatorAccessToken,
-          buyerAccessToken,
-          partnerAttributionID,
-          forceRestAPI: featureFlags.isLsatUpgradable,
+        const patchData = [];
+        const onShippingChange = vi.fn((data, actions) => {
+          return actions.order.patch(patchData);
         });
-      }
 
-      expect.assertions(1);
-    });
+        const experiments = { useShippingChangeCallbackMutation: false };
 
-    test("should return generic error if patchOrder fails", async () => {
-      // $FlowFixMe
-      mockPatchOrder.mockImplementation(() => ZalgoPromise.reject({}));
+        const buyerAccessToken = uniqueID();
 
-      const patchData = [];
-      const onShippingChange = vi.fn((data, actions) => {
-        return actions.order.patch(patchData);
+        const fn = getOnShippingChange(
+          {
+            onShippingChange,
+            partnerAttributionID,
+            featureFlags,
+            experiments,
+            clientID,
+          },
+          { facilitatorAccessToken, createOrder }
+        );
+
+        const data = { buyerAccessToken };
+
+        if (fn) {
+          await fn(data, invocationActions);
+          expect(patchOrder).toBeCalledWith(orderID, patchData, {
+            facilitatorAccessToken,
+            buyerAccessToken,
+            partnerAttributionID,
+            forceRestAPI: featureFlags.isLsatUpgradable,
+          });
+        }
+
+        expect.assertions(1);
       });
 
-      const experiments = { useShippingChangeCallbackMutation: false };
+      test("when useShippingChangeCallbackMutation is active, but appName is not weasley", async () => {
+        // $FlowFixMe
+        mockPatchOrder.mockImplementation(() => ZalgoPromise.resolve({}));
 
-      const buyerAccessToken = uniqueID();
+        const patchData = [];
+        const onShippingChange = vi.fn((data, actions) => {
+          return actions.order.patch(patchData);
+        });
 
-      const fn = getOnShippingChange(
-        {
-          onShippingChange,
-          partnerAttributionID,
-          featureFlags,
-          experiments,
-          clientID,
-        },
-        { facilitatorAccessToken, createOrder }
-      );
+        const experiments = { useShippingChangeCallbackMutation: true };
 
-      const data = { buyerAccessToken };
+        const buyerAccessToken = uniqueID();
 
-      if (fn) {
-        await expect(fn(data, invocationActions)).rejects.toThrow(
-          "Order could not be patched"
+        const fn = getOnShippingChange(
+          {
+            onShippingChange,
+            partnerAttributionID,
+            featureFlags,
+            experiments,
+            clientID,
+          },
+          { facilitatorAccessToken, createOrder }
         );
-      }
 
-      expect.assertions(1);
+        const data = { appName: "xoon", buyerAccessToken };
+
+        if (fn) {
+          await fn(data, invocationActions);
+          expect(patchOrder).toBeCalledWith(orderID, patchData, {
+            facilitatorAccessToken,
+            buyerAccessToken,
+            partnerAttributionID,
+            forceRestAPI: featureFlags.isLsatUpgradable,
+          });
+        }
+
+        expect.assertions(1);
+      });
+
+      test("should return generic error if patchOrder fails", async () => {
+        // $FlowFixMe
+        mockPatchOrder.mockImplementation(() => ZalgoPromise.reject({}));
+
+        const patchData = [];
+        const onShippingChange = vi.fn((data, actions) => {
+          return actions.order.patch(patchData);
+        });
+
+        const experiments = { useShippingChangeCallbackMutation: false };
+
+        const buyerAccessToken = uniqueID();
+
+        const fn = getOnShippingChange(
+          {
+            onShippingChange,
+            partnerAttributionID,
+            featureFlags,
+            experiments,
+            clientID,
+          },
+          { facilitatorAccessToken, createOrder }
+        );
+
+        const data = { buyerAccessToken };
+
+        if (fn) {
+          await expect(fn(data, invocationActions)).rejects.toThrow(
+            "Order could not be patched"
+          );
+        }
+
+        expect.assertions(1);
+      });
     });
 
-    describe("when useShippingChangeCallbackMutation is active", () => {
-      test("should call patchShipping", async () => {
+    describe("should call patchShipping", () => {
+      test("when useShippingChangeCallbackMutation is active, appName is weasley, and there is no access token", async () => {
         // $FlowFixMe
         mockPatchShipping.mockImplementation(() => ZalgoPromise.resolve({}));
 
@@ -172,9 +213,10 @@ describe("onShippingChange", () => {
           },
           { facilitatorAccessToken, createOrder }
         );
+        const data = { appName: "weasley", buyerAccessToken: null };
 
         if (fn) {
-          await fn({}, invocationActions);
+          await fn(data, invocationActions);
         }
 
         expect(patchShipping).toBeCalledWith({
