@@ -39,7 +39,6 @@ describe("onShippingChange", () => {
     const invocationActions = {
       reject: () => ZalgoPromise.reject(),
       resolve: () => ZalgoPromise.resolve(),
-      order: { patch: ZalgoPromise.resolve() },
     };
     const featureFlags = { isLsatUpgradable: false };
 
