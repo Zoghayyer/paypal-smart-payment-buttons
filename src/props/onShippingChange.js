@@ -176,6 +176,10 @@ export function buildXShippingChangeActions({ orderID, actions, facilitatorAcces
         const shouldUsePatchShipping = Boolean(useShippingChangeCallbackMutation && !buyerAccessToken && isWeasley(appName));
         logInvalidShippingChangePatches({ appName, buyerAccessToken, data, shouldUsePatchShipping });
 
+        // Be aware when using `patchShipping` with LAST; Checkoutsellerplatserv(CSP) will throw a PERMISSION_DENIED error for any patch
+        // that contains unsupported paths. There are some merchants with a client integration who are using unsupported paths, such as /purchase_units/@reference_id=='default'.
+        // See https://github.paypal.com/Checkout-R/checkoutsellerplatserv/blob/0822237cd1c8c6dbe01a10f0be576c481d9fcb18/checkoutsellerplatservCore/src/main/java/com/paypal/checkout/orders/core/util/v2/PatchUtility.java#L486-L490
+        // This isn't an issue with `patchOrder` because there is a fallback call to smart API which will use the buyer access token to patch the order with the disallowed paths.
         if (shouldUsePatchShipping) {
             return patchShipping({ clientID, data, orderID }).catch(() => {
                 throw new Error('Order could not be patched');
