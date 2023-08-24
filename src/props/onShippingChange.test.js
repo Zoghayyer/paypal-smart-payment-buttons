@@ -170,7 +170,6 @@ describe("onShippingChange", () => {
         const experiments = { useShippingChangeCallbackMutation: false };
 
         const buyerAccessToken = uniqueID();
-
         const fn = getOnShippingChange(
           {
             onShippingChange,
@@ -281,7 +280,9 @@ describe("onShippingChange", () => {
         buyerAccessToken: "ABC",
         data: [
           {
+            op: "replace",
             path: "/purchase_units/@reference_id=='default'",
+            value: {},
           },
         ],
         shouldUsePatchShipping: false,
@@ -304,16 +305,24 @@ describe("onShippingChange", () => {
         buyerAccessToken: "ABC",
         data: [
           {
+            op: "replace",
             path: "/purchase_units/@reference_id=='default'/amount",
+            value: {},
           },
           {
+            op: "replace",
             path: "/purchase_units/@reference_id=='default'/shipping/address",
+            value: {},
           },
           {
+            op: "replace",
             path: "/purchase_units/@reference_id=='default'/shipping/options",
+            value: {},
           },
           {
+            op: "replace",
             path: "/purchase_units/@reference_id=='d9f80740-38f0-11e8-b467-0ed5f89f718b'/amount",
+            value: {},
           },
         ],
         shouldUsePatchShipping: false,
@@ -325,7 +334,7 @@ describe("onShippingChange", () => {
     test("when patch `data` is not an array, it should emit an info log", () => {
       logInvalidShippingChangePatches({
         appName: "weasley",
-        buyerAccessToken: null,
+        // $FlowFixMe
         data: {},
         shouldUsePatchShipping: true,
       });

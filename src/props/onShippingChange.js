@@ -93,7 +93,8 @@ export type OnShippingChangeData = {|
     |},
     selected_shipping_option? : ShippingOption,
     buyerAccessToken? : ?string,
-    forceRestAPI? : boolean
+    forceRestAPI? : boolean,
+    appName? : string
 |};
 
 export type OnShippingChangeActionsType = {|
@@ -102,8 +103,8 @@ export type OnShippingChangeActionsType = {|
 |};
 
 export type LogInvalidShippingChangePatchesPayload = {|
-    appName? : string,
-    buyerAccessToken : string | null | undefined,
+    appName : string,
+    buyerAccessToken? : string,
     data : $ReadOnlyArray<Query>,
     shouldUsePatchShipping : boolean,
 |};
@@ -123,6 +124,7 @@ const sanitizePatch = (rejected: $ReadOnlyArray<string>, patch: Query): $ReadOnl
     const { path } = patch;
 
     if (!pathPattern.test(path)) {
+        // $FlowFixMe
         rejected.push(path);
     }
     return rejected;
@@ -146,8 +148,7 @@ export const logInvalidShippingChangePatches = ({ appName, buyerAccessToken, dat
                     rejected: JSON.stringify(rejected),
                     hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
                     shouldUsePatchShipping: String(shouldUsePatchShipping)
-                })
-                .flush();
+                });
             }
         } else {
             getLogger()
@@ -155,8 +156,7 @@ export const logInvalidShippingChangePatches = ({ appName, buyerAccessToken, dat
                 appName,
                 hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
                 shouldUsePatchShipping: String(shouldUsePatchShipping)
-            })
-            .flush();
+            });
         }
     } catch(err) {
         getLogger()
@@ -165,8 +165,7 @@ export const logInvalidShippingChangePatches = ({ appName, buyerAccessToken, dat
             errMessage: JSON.stringify(err),
             hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
             shouldUsePatchShipping: String(shouldUsePatchShipping)
-        })
-        .flush();
+        });
     }
 }
 
@@ -175,6 +174,7 @@ export function buildXShippingChangeActions({ orderID, actions, facilitatorAcces
 
     const patch = (data = {}) => {
         const shouldUsePatchShipping = Boolean(useShippingChangeCallbackMutation && !buyerAccessToken && isWeasley(appName));
+        // $FlowFixMe
         logInvalidShippingChangePatches({ appName, buyerAccessToken, data, shouldUsePatchShipping });
 
         // For more details about this change, see DTOPPOR-1620
