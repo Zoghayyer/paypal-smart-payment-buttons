@@ -334,7 +334,6 @@ describe("onShippingChange", () => {
     test("when patch `data` is not an array, it should emit an info log", () => {
       logInvalidShippingChangePatches({
         appName: "weasley",
-        // $FlowFixMe
         data: {},
         shouldUsePatchShipping: true,
       });

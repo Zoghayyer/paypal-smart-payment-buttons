@@ -66,11 +66,13 @@ export type XOnShippingChangeDataType = {|
     appName?: string
 |};
 
+type EmptyObject = $Shape<{||}>
+
 export type XOnShippingChangeActionsType = {|
     resolve : () => ZalgoPromise<void>,
     reject : (string) => ZalgoPromise<void>,
     order : {|
-        patch : (data: $ReadOnlyArray<string>) => ZalgoPromise<OrderResponse>
+        patch : (data: $ReadOnlyArray<Query> | EmptyObject) => ZalgoPromise<OrderResponse>
     |}
 |};
 
@@ -104,8 +106,8 @@ export type OnShippingChangeActionsType = {|
 
 export type LogInvalidShippingChangePatchesPayload = {|
     appName : string,
-    buyerAccessToken? : string,
-    data : $ReadOnlyArray<Query>,
+    buyerAccessToken? : ?string,
+    data : $ReadOnlyArray<Query> | EmptyObject,
     shouldUsePatchShipping : boolean,
 |};
 
@@ -138,33 +140,30 @@ const sanitizePatch = (rejected: $ReadOnlyArray<string>, patch: Query): $ReadOnl
 export const isWeasley = (appName: string): boolean => appName === 'weasley';
 
 export const logInvalidShippingChangePatches = ({ appName, buyerAccessToken, data, shouldUsePatchShipping }: LogInvalidShippingChangePatchesPayload): void => {
+    const payload = {
+        appName,
+        hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
+        shouldUsePatchShipping: String(shouldUsePatchShipping)
+    };
     try {
         if (Array.isArray(data)) {
             const rejected = data.reduce(sanitizePatch, []);
             if (rejected.length > 0) {
                 getLogger()
                 .info(`button_shipping_change_patch_data_has_invalid_path_${appName}`, {
-                    appName,
+                    ...payload,
                     rejected: JSON.stringify(rejected),
-                    hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
-                    shouldUsePatchShipping: String(shouldUsePatchShipping)
                 });
             }
         } else {
             getLogger()
-            .info('button_shipping_change_patch_data_is_object', {
-                appName,
-                hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
-                shouldUsePatchShipping: String(shouldUsePatchShipping)
-            });
+            .info('button_shipping_change_patch_data_is_object', payload);
         }
     } catch(err) {
         getLogger()
         .error('button_shipping_change_patch_data_logging_failed', {
-            appName,
+            ...payload,
             errMessage: JSON.stringify(err),
-            hasBuyerAccessToken: String(Boolean(buyerAccessToken)),
-            shouldUsePatchShipping: String(shouldUsePatchShipping)
         });
     }
 }
@@ -174,7 +173,6 @@ export function buildXShippingChangeActions({ orderID, actions, facilitatorAcces
 
     const patch = (data = {}) => {
         const shouldUsePatchShipping = Boolean(useShippingChangeCallbackMutation && !buyerAccessToken && isWeasley(appName));
-        // $FlowFixMe
         logInvalidShippingChangePatches({ appName, buyerAccessToken, data, shouldUsePatchShipping });
 
         // For more details about this change, see DTOPPOR-1620
