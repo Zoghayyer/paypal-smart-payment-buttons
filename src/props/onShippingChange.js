@@ -122,7 +122,7 @@ const pathPattern = new RegExp(
     /^\/purchase_units\/@reference_id=='(?:\w|-)*'\/(?:amount|shipping\/(?:options|address))$/
 );
 
-const sanitizePatch = (rejected: $ReadOnlyArray<string>, patch: Query): $ReadOnlyArray<string> => {
+export const sanitizePatch = (rejected: $ReadOnlyArray<string>, patch: Query): $ReadOnlyArray<string> => {
     const { path } = patch;
 
     if (!pathPattern.test(path)) {

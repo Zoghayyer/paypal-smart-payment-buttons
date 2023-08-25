@@ -8,8 +8,9 @@ import { patchShipping, patchOrder } from "../api";
 
 import {
   getOnShippingChange,
-  logInvalidShippingChangePatches,
   isWeasley,
+  logInvalidShippingChangePatches,
+  sanitizePatch,
 } from "./onShippingChange";
 
 vi.mock("../api");
@@ -260,6 +261,66 @@ describe("onShippingChange", () => {
 
         expect.assertions(1);
       });
+    });
+  });
+
+  describe("sanitizePatch", () => {
+    test.each([
+      [
+        {
+          op: "replace",
+          path: "/purchase_units/@reference_id=='default'/amount",
+          value: {},
+        },
+        [],
+      ],
+      [
+        {
+          op: "replace",
+          path: "/purchase_units/@reference_id=='default'/shipping/options",
+          value: {},
+        },
+        [],
+      ],
+      [
+        {
+          op: "replace",
+          path: "/purchase_units/@reference_id=='d9f80740-38f0-11e8-b467-0ed5f89f718b'/amount",
+          value: {},
+        },
+        [],
+      ],
+      [
+        {
+          op: "replace",
+          path: "/purchase_units/@reference_id=='d9f80740-38f0-11e8-b467-0ed5f89f718b'/shipping/address",
+          value: {},
+        },
+        [],
+      ],
+    ])("should not reject valid patch paths %s", (rejected, output) => {
+      expect(sanitizePatch([], rejected)).toStrictEqual(output);
+    });
+
+    test.each([
+      [
+        {
+          op: "replace",
+          path: "/purchase_units/@reference_id=='default'",
+          value: {},
+        },
+        ["/purchase_units/@reference_id=='default'"],
+      ],
+      [
+        {
+          op: "replace",
+          path: "/purchase_units/@reference_id=='default'/invoice",
+          value: {},
+        },
+        ["/purchase_units/@reference_id=='default'/invoice"],
+      ],
+    ])("should reject invalid patch paths %s", (rejected, output) => {
+      expect(sanitizePatch([], rejected)).toStrictEqual(output);
     });
   });
 
